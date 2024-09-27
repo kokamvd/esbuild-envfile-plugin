@@ -1,17 +1,19 @@
 # Description:
+Forked from [rw3iss/esbuild-envfile-plugin](https://github.com/rw3iss/esbuild-envfile-plugin)
+
 This package is a plugin for [esbuild](https://github.com/evanw/esbuild). When used, it will look for a .env file in the current project file's directory, or any parent, until it finds one.
 It will combine the found .env variables with the system-wide process.env variables, which can all be used from the project file.
 It uses the 'dotenv' package to parse the .env file (the package isn't loaded into your project, only into the esbuild script).
 
 ## Installation:
-```npm install esbuild esbuild-envfile-plugin dotenv --save-dev```
+```npm install esbuild @kokamvd/esbuild-envfile-plugin dotenv --save-dev```
 
 ## In esbuild script:
 ```
-const envFilePlugin = require('esbuild-envfile-plugin');
+const envFilePlugin = require('@kokamvd/esbuild-envfile-plugin');
 
 require('esbuild').build({
-    plugins: [envFilePlugin]
+    plugins: [envFilePlugin()]
 });
 ```
 
@@ -43,7 +45,12 @@ function build(entryFile, outFile) {
         define: { "process.env.NODE_ENV": IS_DEV ? "\"development\"" : "\"product\"" },
         target: TARGET,
         logLevel: 'silent',
-        plugins: [envFilePlugin]   // <**************** USAGE ****************
+        plugins: [
+            envFilePlugin({ // <**************** USAGE ****************
+                includeSystemProcessEnv: false,
+                filterByPrefix: null,
+            })
+        ]   
     })
     .then(r => { console.log("Build succeeded.") })
     .catch((e) => {
@@ -53,4 +60,28 @@ function build(entryFile, outFile) {
 }
 
 build(`${APP_BASE}/${ENTRY_FILE}`, `${OUTPUT_DIR}/${OUTPUT_FILE}`);
+```
+
+## Options
+
+**Warning:** if you set `includeSystemProcessEnv` to `true` and filterByPrefix is `null`, all CI environment variables will be included in the build.  
+**This may result in sensitive data leakage!**
+
+### includeSystemProcessEnv
+
+Type: `boolean`  
+Default: `false`
+
+### filterByPrefix
+
+If set, only variables with a name starting with the prefix will be included in the build.
+
+Type: `string`|`null`   
+Default: `null`
+
+
+Example:
+
+```
+filterByPrefix: 'ESB_'
 ```

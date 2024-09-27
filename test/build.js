@@ -12,29 +12,39 @@ const OUTPUT_FILE = 'app.js';
 const TARGET = 'es2020';
 
 // try to use dotenv to load in custom local env vars to existing node runtime env vars:
-const envFile = process.env.NODE_ENV ? `.env.${process.env.NODE_ENV}` : '.env.local';
-dotenv.config({ path: envFile })
+const envFile = process.env.NODE_ENV
+  ? `.env.${process.env.NODE_ENV}`
+  : '.env.local';
+dotenv.config({ path: envFile });
 
 // collect all new env vars wrapped in quotes for passage to build define
 const { define } = getNormalizedEnvDefines();
 
 function build(entryFile, outFile) {
-    console.log('build() ', entryFile, '=>', outFile)
-    require('esbuild').build({
-        entryPoints: [path.resolve(entryFile)],
-        outfile: path.resolve(outFile),
-        platform: 'node',
-        bundle: true,
-        target: TARGET,
-        logLevel: 'silent',
-        plugins: [envFilePlugin],
-        define
+  console.log('build() ', entryFile, '=>', outFile);
+  require('esbuild')
+    .build({
+      entryPoints: [path.resolve(entryFile)],
+      outfile: path.resolve(outFile),
+      platform: 'node',
+      bundle: true,
+      target: TARGET,
+      logLevel: 'silent',
+      plugins: [
+        envFilePlugin({
+          includeSystemProcessEnv: false,
+          filterByPrefix: null,
+        }),
+      ],
+      define,
     })
-        .then(r => { console.log("Build succeeded.") })
-        .catch((e) => {
-            console.log("Error building:", e.message);
-            process.exit(1)
-        })
+    .then((r) => {
+      console.log('Build succeeded.');
+    })
+    .catch((e) => {
+      console.log('Error building:', e.message);
+      process.exit(1);
+    });
 }
 
 build(`${APP_BASE}/${ENTRY_FILE}`, `${OUTPUT_DIR}/${OUTPUT_FILE}`);

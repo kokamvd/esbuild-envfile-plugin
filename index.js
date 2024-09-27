@@ -1,49 +1,71 @@
-const path = require("path");
-const fs = require("fs");
-const { findEnvFile } = require("./utils");
+const path = require('path');
+const fs = require('fs');
+const { findEnvFile } = require('./utils');
 
-const DEFAULT_ENV = process.env.NODE_ENV || "development";
+const DEFAULT_ENV = process.env.NODE_ENV || 'development';
 
-module.exports = {
-    name: "env",
+module.exports = (
+  options = {
+    includeSystemProcessEnv: false,
+    filterByPrefix: null,
+  }
+) => ({
+  name: 'env',
 
-    setup(build) {
-        build.onResolve({ filter: /^env$/ }, async (args) => {
-            const rootPath = path.resolve('.');
-            const env = ((build.initialOptions?.define || {})['process.env.NODE_ENV'] || DEFAULT_ENV).replace(/"/g, '');
-            return {
-                path: args.path,
-                pluginData: {
-                    ...args.pluginData,
-                    envPath: findEnvFile(args.resolveDir, rootPath, env),
-                },
-                namespace: "env-ns",
-            };
-        });
+  setup(build) {
+    build.onResolve({ filter: /^env$/ }, async (args) => {
+      const rootPath = path.resolve('.');
+      const env = (
+        (build.initialOptions?.define || {})['process.env.NODE_ENV'] ||
+        DEFAULT_ENV
+      ).replace(/"/g, '');
+      return {
+        path: args.path,
+        pluginData: {
+          ...args.pluginData,
+          envPath: findEnvFile(args.resolveDir, rootPath, env),
+          options,
+        },
+        namespace: 'env-ns',
+      };
+    });
 
-        build.onLoad({ filter: /.*/, namespace: "env-ns" }, async (args) => {
-            let envPath = args.pluginData?.envPath;
-            let config = {};
-            let contents = '{}';
+    build.onLoad({ filter: /.*/, namespace: 'env-ns' }, async (args) => {
+      let envPath = args.pluginData?.envPath;
+      let envConfig = {};
+      let contents = '{}';
+      const options = args.pluginData?.options ?? {};
 
-            if (envPath) {
-                try {
-                    // read in .env file contents and combine with regular .env:
-                    let data = await fs.promises.readFile(envPath, "utf8");
-                    const buf = Buffer.from(data);
-                    config = require("dotenv").parse(buf);
-                    contents = JSON.stringify({ ...process.env, ...config });
-                } catch (e) {
-                    console.warn('Exception in esbuild-envfile-plguin build.onLoad():', e);
-                }
-            } else {
-                contents = JSON.stringify(process.env);
-            }
+      try {
+        if (envPath) {
+          const data = await fs.promises.readFile(envPath, 'utf8');
+          envConfig = require('dotenv').parse(Buffer.from(data));
+        }
 
-            return {
-                contents,
-                loader: "json",
-            };
-        });
-    },
-};
+        const contentsObj = options.includeSystemProcessEnv
+          ? { ...process.env, ...envConfig }
+          : { ...envConfig };
+
+        if (options.filterByPrefix) {
+          contents = JSON.stringify(
+            Object.fromEntries(
+              Object.entries(contentsObj).filter(([key]) =>
+                key.startsWith(options.filterByPrefix)
+              )
+            )
+          );
+        } else {
+          contents = JSON.stringify(contentsObj);
+        }
+      } catch (e) {
+        console.warn('Exception in esbuild-envfile-plugin build.onLoad():', e);
+        contents = '{}';
+      }
+
+      return {
+        contents,
+        loader: 'json',
+      };
+    });
+  },
+});
